@@ -1,54 +1,54 @@
-let SITE_KEY = '6LcDQ4wpAAAAAByj1BgSj0l9cJ9jiyM2-CcHMXSR';
+export default class GoogleReCaptcha {
+  id;
 
-function loadScript(url) {
-  const head = document.querySelector('head');
-  let script = head.querySelector(`script[src="${url}"]`);
-  if (!script) {
-    script = document.createElement('script');
-    script.src = url;
-    script.async = true;
-    head.append(script);
-    return script;
+  siteKey;
+
+  loadPromise;
+
+  constructor(siteKey, id) {
+    this.siteKey = siteKey;
+    this.id = id;
   }
-  return script;
-}
 
-export async function transformCaptchaDOM(formDef, form) {
-  SITE_KEY = formDef.find((field) => field.Name === 'googleRecaptcha')?.Value;
-  const button = form.querySelector('button[type="submit"]');
-  if (SITE_KEY && button) {
-    const obs = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          loadScript(`https://www.google.com/recaptcha/api.js?render=${SITE_KEY}`);
-          obs.disconnect();
-        }
+  #loadScript(url) {
+    if (!this.loadPromise) {
+      this.loadPromise = new Promise((resolve, reject) => {
+        const head = document.head || document.querySelector('head');
+        const script = document.createElement('script');
+        script.src = url;
+        script.async = true;
+        script.onload = () => resolve(window.grecaptcha);
+        script.onerror = () => reject(new Error(`Failed to load script ${url}`));
+        head.append(script);
       });
-    });
-    obs.observe(button);
+    }
   }
-}
 
-export async function transformCaptchaRequest(request) {
-  const { grecaptcha } = window;
-  const { body, headers, url } = request;
-  return new Promise((resolve) => {
-    if (grecaptcha) {
-      grecaptcha.ready(() => {
-        grecaptcha.execute(SITE_KEY, { action: 'submit' }).then(async (token) => {
-          const newbody = {
-            data: JSON.parse(body).data,
-            token,
-          };
-          resolve({
-            body: JSON.stringify(newbody),
-            headers,
-            url,
-          });
+  loadCaptcha(form) {
+    if (form && this.siteKey) {
+      const submit = form.querySelector('button[type="submit"]');
+      const obs = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            this.#loadScript(`https://www.google.com/recaptcha/api.js?render=${this.siteKey}`);
+            obs.disconnect();
+          }
         });
       });
-    } else {
-      resolve(request);
+      obs.observe(submit);
     }
-  });
+  }
+
+  async getToken() {
+    if (!this.siteKey) {
+      return null;
+    }
+    return new Promise((resolve) => {
+      const { grecaptcha } = window;
+      grecaptcha.ready(async () => {
+        const token = await grecaptcha.execute(this.siteKey, { action: 'submit' });
+        resolve(token);
+      });
+    });
+  }
 }
