@@ -1,4 +1,4 @@
-let SITE_KEY = '6LcB318mAAAAAO6smzDd-TtD1-AWlidsHsCXcJHy';
+let SITE_KEY = '6Le7B5cpAAAAAMMod1WtczjQBi6VdfDfD_2JyM0A';
 
 function loadScript(url) {
   const head = document.querySelector('head');
